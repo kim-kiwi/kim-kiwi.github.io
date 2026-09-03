@@ -1,4 +1,12 @@
 body {
 	width: 800px;
-	margin: 0 auto;
+	margin: 60px auto;
+}
+
+a {
+	color: #000;
+}
+a:hover {
+	color: #fff;
+	background-color: #000;
 }
