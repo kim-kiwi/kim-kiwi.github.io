@@ -1,0 +1,161 @@
+<!DOCTYPE>
+<html lang="kr">
+
+<head>
+	<title>RG the-sdk 조사</title>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="stylesheet" type="text/css" href="../style.css">
+</head>
+
+<body>
+	<h1>RG the-sdk 조사</h1>
+	<span class="small">2026.09.03</span>
+	<p>
+		RG에서 의존하는 the-sdk에 대해 알아보자.
+		우선 알아봐야할 부분들은 다음과 같다.
+	</p>
+	<ol>
+		<li><a href="#1">응답 래핑</a></li>
+		<li><a href="#2">예외 처리</a></li>
+		<li><a href="#3">요청 로깅</a></li>
+		<li><a href="#4">Swagger</a></li>
+	</ol>
+	<h2 id="1">응답 래핑</h2>
+	<pre><code>package team.themoment.sdk.response
+
+import com.fasterxml.jackson.annotation.JsonInclude
+import io.swagger.v3.oas.annotations.media.Schema
+import org.springframework.http.HttpStatus
+
+data class CommonApiResponse<T>(
+    @field:Schema(description = "상태 메시지", nullable = false, example = "OK")
+    val status: HttpStatus,
+    @field:Schema(description = "상태 코드", nullable = false, example = "200")
+    val code: Int,
+    @field:Schema(description = "메시지", nullable = false, example = "완료되었습니다.")
+    val message: String,
+    @field:Schema(description = "데이터", nullable = true)
+    @field:JsonInclude(JsonInclude.Include.NON_NULL)
+    val data: T? = null,
+) {
+    companion object {
+        @JvmStatic
+        fun success(message: String): CommonApiResponse<Nothing> =
+            CommonApiResponse(
+                status = HttpStatus.OK,
+                code = HttpStatus.OK.value(),
+                message = message,
+            )
+
+        @JvmStatic
+        fun <T> success(
+            message: String,
+            data: T,
+        ): CommonApiResponse<T> =
+            CommonApiResponse(
+                status = HttpStatus.OK,
+                code = HttpStatus.OK.value(),
+                message = message,
+                data = data,
+            )
+
+        @JvmStatic
+        fun created(message: String): CommonApiResponse<Nothing> =
+            CommonApiResponse(
+                status = HttpStatus.CREATED,
+                code = HttpStatus.CREATED.value(),
+                message = message,
+            )
+
+        @JvmStatic
+        fun <T> created(
+            message: String,
+            data: T,
+        ): CommonApiResponse<T> =
+            CommonApiResponse(
+                status = HttpStatus.CREATED,
+                code = HttpStatus.CREATED.value(),
+                message = message,
+                data = data,
+            )
+
+        @JvmStatic
+        fun error(
+            message: String,
+            status: HttpStatus,
+        ): CommonApiResponse<Nothing> =
+            CommonApiResponse(
+                status = status,
+                code = status.value(),
+                message = message,
+            )
+    }
+}</code></pre>
+	<p>
+		기본적으로 쓰이는 응답 api인듯 하다.
+		@JvmStatic을 써놔서 kotlin으로 작성됐지만 java에서도 이용 가능한 것 같다.
+		@field.Schema로 Swagger에서 인식 가능하게 해놓은 듯 하다.	
+	</p>
+	<pre><code>{
+  "status": "OK",
+  "code": 200,
+  "message": "OK",
+  "data": <컨트롤러 반환값>
+}</code></pre>
+	<p>
+		이런식으로 요청 구조를 통일 시킨다고 한다.
+	</p>
+	<h2 id="2">예외 처리</h2>
+	<pre><code>package team.themoment.sdk.exception
+
+import org.springframework.http.HttpStatus
+
+class ExpectedException(
+    message: String,
+    val statusCode: HttpStatus,
+) : RuntimeException(message) {
+    constructor(statusCode: HttpStatus) : this(statusCode.reasonPhrase, statusCode)
+
+    override fun fillInStackTrace(): Throwable = this
+}</code></pre>
+	<p>
+		HTTP 요청 처리중 발생한 오류들은 이 형식으로 발생되는 듯 하다.
+		Global Error Handler가 가로채는 구조같다.
+		에러가 발생해도 <code>CommonApiResponse</code> 형식으로 통일되어 응답된다고 한다.
+		<code>ExpectedException</code>은 stack trace를 생략해서 더 빠르다고 한다.
+	</p>
+	<h2 id="3">요청 로깅</h2>
+	<p>
+		sdk가 설치되면 http 요청/응답들이 자동으로 로깅되는 듯 하다.
+		요청/응답은 같은 LOG-ID를 공유하기에 쉽게 둘을 짝지을 수 있다고 한다.
+		<code>LoggingFilter.kt</code>가 해당 역할을 수행하는 것 같다.
+	</p>
+	<h2 id="4">Swagger</h2>
+	<p>
+		<code>application.yml</code>의 <code>sdk.*</code> 영역에 작성된 값들을 기반으로 config가 가능한 것 같다.
+		<code>sdk.swagger</code>에 들어갈 수 있는 옵션들을 알아보자.
+	</p>
+	<ul>
+		<li>sdk.swagger.enabled - 활성 여부</li>
+		<li>sdk.swagger.title - 문서 제목</li>
+		<li>sdk.swagger.description - 문서 설명</li>
+		<li>sdk.swagger.version - API 버전</li>
+		<li>sdk.swagger.group - API 그룹명(쿠버네티스 같은 곳에서 쓰이는 듯 하다)</li>
+		<li>sdk.swagger.path-to-match - 문서화할 경로 목록</li>
+	</ul>
+	<p>
+		예제:
+	</p>
+	<pre><code>swagger:
+  enabled: true  # Enable/disable swagger configuration (default: true)
+  title: "My API Documentation"
+  description: "API Documentation for My Service"
+  version: "v1"
+  group: "My API"
+  paths-to-match:
+    - "/v1/**"
+    - "/api/**"</pre></code>
+</body>
+
+</html>
