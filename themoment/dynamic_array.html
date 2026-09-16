@@ -10,7 +10,7 @@
 
 <body>
 	<h1>동적 배열</h1>
-	<span class="small">????.??.??</span>
+	<span class="small">2026.09.16</span>
 	<p>
 		동적 배열에 대해서 알아봅시다.
 	</p>
@@ -24,7 +24,7 @@
 	</p>
 	<p>
 		그렇기 때문에 동적 배열을 당연하게 여기며 살아가는 프로그래머도 있는 것 같습니다.
-		이번 글에서는 동적 배열의 내부 구현에 대해 알아보며 얼마나 많은 것을 제공받고 있었는지 알아보면 좋을 듯 합니다.
+		이번 글에서는 아무생각 없이 쓰였던 동적 배열이 어떻게 구현되는지 알아봅시다.
 	</p>
 	<h2>동적 배열의 기본 동작</h2>
 	<p>
@@ -172,7 +172,106 @@
 	<td id="mwAQ8"><a rel="mw:WikiLink" href="https://en.wikipedia.org/wiki/C_Sharp_(programming_language)" title="C Sharp (programming language)" id="mwARA">C#</a> (<a rel="mw:WikiLink" href="https://en.wikipedia.org/wiki/.NET" title=".NET" id="mwARE">.NET</a> 8) List</td>
 	<td id="mwARI">2</td></tr>
 	</tbody></table>
-	<h2>흠</h2>
+	<h2>C에서의 동적 배열</h2>
+	<p>
+		C에서 동적 배열을 표현하려면 다음과 같은 구조체를 만들 수 있습니다.
+	</p>
+<pre><code>struct DynamicIntArray {
+	int *data;
+	size_t size;
+	size_t cap;
+};</code></pre>
+	<p>
+		하지만 이렇게 하면 매 타입마다 새로운 구조체를 만들어 줘야하는 번거로움이 있습니다.
+		그래서 이런 방법을 사용할 수 있습니다.
+	</p>
+<pre><code>struct DynamicArrayHeader {
+	size_t size;
+	size_t cap;
+};</code></pre>
+	<p>
+		이렇게 size와 cap 정보만을 담은 <code>Header</code> 구조체를 먼저 만듭니다.
+	</p>
+	<p>
+		그 다음 이런식으로 배열을 할당해줍니다.
+	</p>
+<pre><code>int *arr = (int*)((struct DynamicArrayHeader*)malloc(10*sizeof(int)+sizeof(struct DynamicArrayHeader))+1);</code></pre>
+	<p>
+		이렇게 할당하면 메모리는 다음과 같은 구조가 됩니다.
+	</p>
+	<pre><code>
++--------+-------------+
+| Header |   int[10]   |
++--------+-------------+
+         |
+         `-> int *arr가 가리키는 위치
+	</code></pre>
+	<p>
+		꽤나 긴 코드이지만 뜯어보면 간단한 구조를 가집니다.
+	</p>
+<pre><code>
+// int 10개, 헤더 한 개 크기의 메모리를 할당합니다.
+malloc(10*sizeof(int) + sizeof(struct DynamicArrayHeader))
+
+// 할당한 메모리의 타입을 변경합니다.
+(struct DynamicArrayHeader*)
+
+// 포인터를 1만큼 이동시킵니다.
+// 타입이 struct DynamicArrayHeader*로 변환됐기에
+// struct DynamicArrayHeader의 바이트 수만큼 이동합니다.
++ 1
+
+// 메모리의 타입을 변경합니다.
+(int*)
+</code></pre>
+	<p>
+		이런식으로 헤더를 포인터 앞에 숨겨버리면 <code>int*</code>같은 단순한 포인터를 동적 배열처럼 사용할 수 있게 됩니다.
+	</p>
+	<h3>구현</h3>
+	<p>
+		지금까지는 동적 배열에 필요한 상태와, 그 상태를 어떤식으로 배치하는지를 알아봤습니다.
+		이제 실제 동적 배열을 구현해봅시다.
+	</p>
+	<p>
+		구현 단순성을 위해 매크로와 헤더 트릭을 사용하지 않겠습니다.
+		간단한 예시이기 때문에 append 기능만 작성했습니다.
+	</p>
+<pre><code>#include &lt;stdlib.h&gt;
+#include &lt;stddef.h&gt;
+#include &lt;stdio.h&gt;
+
+typedef struct {
+	int *data;
+	size_t size;
+	size_t cap;
+} DynamicIntArray;
+
+int da_append(DynamicIntArray* arr, int value)
+{
+	if (arr-&gt;size &gt;= arr-&gt;cap) {
+		size_t new_cap = arr-&gt;cap == 0 ? 2 : arr-&gt;cap*2;
+		int *new_data = realloc(arr-&gt;data, sizeof(*arr-&gt;data)*new_cap);
+		if (new_data == NULL) return 1;
+		arr-&gt;data = new_data;
+		arr-&gt;cap = new_cap;
+	}
+	arr-&gt;data[arr-&gt;size++] = value;
+	return 0;
+}
+
+int main()
+{
+	DynamicIntArray arr = {0};
+	da_append(&amp;arr, 10);
+	da_append(&amp;arr, 20);
+	da_append(&amp;arr, 30);
+	da_append(&amp;arr, 40);
+	for (int i = 0; i &lt; arr.size; ++i) {
+		printf("%d\n", arr.data[i]);
+	}
+	return 0;
+}
+</code></pre>
 </body>
 
 </html>
