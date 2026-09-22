@@ -1,0 +1,127 @@
+<!DOCTYPE>
+<html lang="kr">
+
+<head>
+	<title>IaC and Pulumi</title>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="stylesheet" type="text/css" href="../style.css">
+</head>
+
+<body>
+	<h1>IaC and Pulumi</h1>
+	<span class="small">2026.09.22</span>
+	<p>
+		IaC와 Pulumi에 대해 알아보자.
+	</p>
+
+	<h2>IaC</h2>
+	<p>
+		IaC란 수동으로 하드웨어를 설정하는 대신, 코드를 통해 인프라를 관리하고 생성하는 기술이다.
+		장점은 다음과 같다:
+	</p>
+	<ul>
+		<li>매번 똑같은 환경을 오류없이 만들어낼 수 있다.</li>
+		<li>수동보다 속도가 빠르다.</li>
+		<li>사람이 실수할 일이 없다.</li>
+	</ul>
+	<h3>명령형과 선언형</h3>
+	<p>
+		IaC는 명령형은 방식과 선언형 방식이 있다.
+	</p>
+	<p>
+		명령형 방식은 '어떻게'할 것인지를 코드로 나타낸다.
+		예를 들자면 '인스턴스 A를 만들어라' -&gt; '스토리지 10GB를 추가하라' 이런식이다.
+	</p>
+	<p>
+		선언형 방식은 '무엇'이 있어야 하는지를 코드로 나타낸다.
+		예를 들자면 '스토리지 10GB를 가진 인스턴스 A가 있어야함.'처럼 표현한다.
+	</p>
+	<h3>State</h3>
+	<p>
+		State란 실제로 생성된 인프라의 상태를 기록한 것이다.
+		작성된 코드와 현재 배포된 상태를 비교할때 쓰인다.
+	</p>
+	<p>
+		예를 들어 현재 State가 '인스턴스 2개'이고, IaC는 '인스턴스 3개'를 요구한다면
+		실제로는 인스턴스 1개만 추가로 만드는 식으로 효율적으로 동작할 수 있다.
+	</p>
+	<h3>멱등성</h3>
+	<p>
+		멱등성이란 여러번 실행해도 항상 똑같은 결과를 보장하는 것이다.
+		IaC의 경우 여러번 실행해도 항상 IaC의 요구사항에 맞춰 배포 상태가 조절되는 멱등성을 제공한다.
+	</p>
+	<h2>Pulumi</h2>
+	<p>
+		범용 프로그래밍 언어(Python, TypeScript 등)를 사용해서 클라우드 인프라를 정의하고 관리하는 IaC 도구이다.
+	</p>
+	<h3>동작 방식</h3>
+	<ol>
+		<li>코드를 실행시켜 리소스 그래프와 목표 상태를 계산한다.</li>
+		<li>현재 상태와 목표 상태를 비교한 후, 변경 계획(Plan)을 만든다.</li>
+		<li>변경 계획이 승인되면 클라우드 제공업체 API를 통해 실제 인프라를 업데이트한다.</li>
+		<li>바뀐 상태를 State 파일에 업데이트한다.</li>
+	</ol>
+	<h3>State 파일</h3>
+	<h4>input</h4>
+	<p>
+		리소스 생성 시 전달하는 값들.
+	</p>
+	<h4>output</h4>
+	<p>
+		리소스 생성 후 결정되는 값들. 다른 리소스가 의존할때 사용됨.
+	</p>
+	<h3>CLI</h3>
+	<ul>
+	<li><pre><code>pulumi new &lt;템플릿&gt;</code></pre>
+	<p>
+		특정 템플릿에 맞춰 새 프로젝트를 생성한다. (예: python, aws-typescript 등)
+	</p>
+	</li>
+	<li>
+	<pre><code>pulumi stack &lt;명령&gt;
+pulumi stack init dev    # 스택 생성
+pulumi stack select prod # 스택 전환
+pulumi stack ls          # 스택 목록
+pulumi stack rm dev      # 스택 삭제</code></pre>
+	<p>
+		stack이란 동일한 구성코드로 만든 실행환경의 단위이다. (예: dev, prod, test 등)
+	</p>
+	</li>
+	<li>
+	<pre><code>pulumi preview</code></pre>
+	<p>
+		변경 전 예상 작업들을 미리 보여준다.
+	</p>
+	</li>
+	<li>
+	<pre><code>pulumi up</code></pre>
+	<p>
+		실제 변경을 행한다.
+	</p>
+	</li>
+	<li>
+	<pre><code>pulumi destroy</code></pre>
+	<p>
+		스택에 정의된 모든 인프라 자원을 삭제하여 비용 청구를 방지한다.
+	</p>
+	</li>
+	<li>
+	<pre><code>pulumi refresh</code></pre>
+	<p>
+		실제 인프라 상태를 조회하여 State 파일에 반영한다.
+	</p>
+	</li>
+	<li>
+	<pre><code>pulumi state &lt;명령&gt;
+pulumi state show [resource]   # 특정 자원의 속성값 확인
+pulumi state delete [resource] # 상태 파일에서 리소스 제거
+</code></pre>
+	<p>
+		State가 꼬였을때 주로 쓴다. delete의 경우 State에서만 지우고, 실제 클라우드에서 안 지워서 비용이 계속 발생할 수 있으니 주의해야한다.
+	</p>
+	</li>
+	</ul>
+</body>
+
+</html>

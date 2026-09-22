@@ -1,0 +1,110 @@
+<!DOCTYPE>
+<html lang="kr">
+
+<head>
+	<title>CI/CD and Docker</title>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="stylesheet" type="text/css" href="../style.css">
+</head>
+
+<body>
+	<h1>CI/CD and Docker</h1>
+	<span class="small">2026.09.22</span>
+	<p>
+		CI/CD와 Docker에 대해 알아보자.
+	</p>
+	<h2>github CI/CD workflows</h2>
+	<p>
+		github의 CI/CD는 .yml 형식으로 적성된다.
+	</p>
+	<p>
+		<a href="https://github.com/themoment-team/readygsm-server/blob/master/.github/workflows/readygsm-prod-cd.yml">readygsm 배포코드</a>를 통해 자세히 알아보자.
+	</p>
+	<h3>트리거</h3>
+	<pre><code>on:
+  push:
+    branches:
+      - master</code></pre>
+    	<p>
+		위 코드처럼 언제 배포할지 설정할 수 있다.
+	</p>
+	<h3>가상 환경</h3>
+	<pre><code>jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest</code></pre>
+    	<p>
+		위와 같이 어느 가상 환경에서 코드를 실행할지 설정할 수 있다.
+	</p>
+	<h3>코드 가져오기</h3>
+	<pre><code>    steps:
+      - name: Checkout
+        uses: actions/checkout@v4</code></pre>
+	<p>
+		위와 같이 repo 코드를 가상 환경에 가져온다.
+		<code>actions/checkout@v4</code>는 사전에 이미 마켓플레이스에 올라온 액션이다.
+	</p>
+	<h3>환경 구축</h3>
+	<pre><code>    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"</code></pre>
+	<p>
+		위와 같이 Java등의 환경을 구축할 수 있다.
+		<code>actions/setup-java@v4</code>는 사전에 이미 마켓플레이스에 올라온 액션이다.
+	</p>
+	<pre><code>      - name: Build JAR
+        run: ./gradlew bootJar -x test --no-daemon</code></pre>
+	<p>
+		<code>run</code>를 통해 cli 명령을 실행할 수도 있다.
+	</p>
+	<h3>배포</h3>
+	<pre><code>      - name: Deploy to EC2 via SSM
+        env:
+          INSTANCE_ID: ${{ steps.infra.outputs.instance_id }}
+          PROD_ECR_IMAGE: ${{ steps.build-image.outputs.image_uri }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          APP_DOMAIN: ${{ secrets.APP_DOMAIN }}
+        run: |
+          set -e
+	  ...</code></pre>
+	<p>
+		최종적으로 클라우드 서버에 배포하는 코드이다.
+		<code>secrets.APP_DOMAIN</code>을 보면 알 수 있듯, 비밀키등을 외부에서 가져올 수 있다.
+		github의 Vault라는 가상 저장소에 저장되는 값이라고 한다.
+	</p>
+	<h2>Docker in ReadyGSM</h2>
+	<h3>Stage</h3>
+	<p>
+		develop branch에 push가 발생하면 배포가 시작된다.
+		github actions가 stage용 vm에 빌드한 프로젝트 jar파일과 compose용 docker파일, nginx 설정 파일을 전송한다.
+	</p>
+	<p>
+		서버가 파일을 받은 후에는 docker compose를 통해 환경을 구성한다.
+		nginx, certbot, 실제 서비스 앱, mysql, redis등을 실행한다.
+	</p>
+	<h3>Prod</h3>
+	<p>
+		master branch에 push가 발생하면 배포가 시작된다.
+	</p>
+	<ol>
+		<li>github actions가 jar파일을 빌드한다.</li>
+		<li>pulumi를 통해 aws 환경을 구축한다.</li>
+		<li>도커 이미지를 빌드한다.</li>
+		<li>AWS ECR에 이미지를 올린다.</li>
+		<li>AWS EC2에 배포 명령을 보낸다.</li>
+		<li>AWS EC2에서 docker compose를 실행한다.</li>
+	</ol>
+	<p>
+		최초로 docker compose하면 nginx, certbot, 실제 서비스 앱, mysql, redis등을 실행한다.
+		이후에는 app 컨테이너만 새 이미지로 교체한다. mysql이나 redis는 유지된다.
+	</p>
+</body>
+
+</html>
